@@ -1897,6 +1897,10 @@ class PlPlayerController with BlockConfigMixin {
             const Duration(milliseconds: 500),
             onTimeout: () {},
           );
+          // 退出全屏时，延迟等待方向旋转后改变组件
+          if (OS.isHarmony && !HarmonyChannel.isWindowMode) {
+            await Future<void>.delayed(const Duration(milliseconds: 32));
+          }
         } else {
           await exitDesktopFullScreen();
         }

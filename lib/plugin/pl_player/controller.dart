@@ -1906,10 +1906,6 @@ class PlPlayerController with BlockConfigMixin {
         }
       }
     } finally {
-      if (!status && horizontalScreen && PlatformUtils.isMobile && !HarmonyChannel.isWindowMode) {
-        // 退出全屏时，若横屏适配开启,延迟一帧等待方向旋转
-        await Future<void>.delayed(const Duration(milliseconds: 16));
-      }
       _setFullScreen(status);
       _fsProcessing = false;
     }

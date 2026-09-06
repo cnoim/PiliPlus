@@ -2,6 +2,7 @@ import { curves, LengthMetrics, SymbolGlyphModifier, uiMaterial } from '@kit.Ark
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { HdsAnimationMode, hdsMaterial, HdsTabs, HdsTabsController } from '@kit.UIDesignKit';
 import common from '@ohos.app.ability.common';
+import image from '@ohos.multimedia.image';
 import window from '@ohos.window';
 import { FlutterPage } from '@ohos/flutter_ohos';
 
@@ -32,7 +33,11 @@ const TOP_BAR_MOTION_CURVE: ICurve = curves.cubicBezierCurve(0.2, 0, 0, 1);
 /// 搜索行淡出/淡入：收起时抢在高度压扁之前淡出，展开时等高度让出空间后
 /// 再淡入，避免文字在被压扁的行内闪现（旧实现同时做，观感发硬）
 const TOP_BAR_FADE_DURATION = 120;
-const TOP_BAR_FADE_IN_DELAY = 60;
+const TOP_BAR_FADE_IN_DELAY = 48;
+/// 转屏动画参数
+const ROTATION_MASK_FADE_DURATION = 130;
+const ROTATION_MASK_FADE_DELAY = 75;
+const ROTATION_MASK_MAX_LIFETIME = 2000;
 
 function topBarMaterial(interactive: boolean): uiMaterial.ImmersiveMaterial {
   return new uiMaterial.ImmersiveMaterial({
@@ -111,6 +116,14 @@ struct Index {
   private sizeCallback: ((size: window.Size) => void) | null = null;
   private rectCallback: ((opts: window.RectChangeOptions) => void) | null = null;
 
+  /// 转屏旧画面遮罩
+  @State rotationMask: image.PixelMap | null = null;
+  @State rotationMaskOpacity: number = 1;
+  private rotationCallback: ((info: window.RotationChangeInfo) => void) | null = null;
+  private rotatingCount: number = 0;
+  private rotationMaskTimers: number[] = [];
+  private currentOrientation: number = 0;
+
   onHomeTabIndexChanged(): void {
     if (this.homeActiveTabIndex >= 0 && this.homeActiveTabIndex < this.homeTabs.length) {
       this.categoryCurrentIndex = this.homeActiveTabIndex;
@@ -136,6 +149,46 @@ struct Index {
     // 按窗口宽高比分流顶栏（收起/隐藏/显示）
     AppStorage.setOrCreate('winWidth', this.winWidth);
     AppStorage.setOrCreate('winHeight', this.winHeight);
+  }
+
+  /// 屏幕旋转动画：模仿安卓CROSSFADE
+  /// 旋转开始时捕获旧画面快照，新旧界面淡入淡出
+  private RotatationAnimation(w: window.Window): void {
+    try {
+      this.rotationMask = w.snapshotSync();
+      this.rotationMaskOpacity = 1;
+      this.startRotationMaskFade();
+    } catch (err) {
+      console.error(TAG, `capture rotation mask failed: ${err}`);
+      this.cleanupRotationMask();
+    }
+  }
+
+  private startRotationMaskFade(): void {
+    this.rotationMaskTimers.push(setTimeout(() => {
+      this.rotationMaskOpacity = 0;
+      this.rotationMaskTimers.push(setTimeout(() => {
+        this.cleanupRotationMask();
+      }, ROTATION_MASK_FADE_DURATION));
+    }, ROTATION_MASK_FADE_DELAY));
+    // 兜底：旋转流程异常中断时强制清理，避免遮罩残留
+    this.rotationMaskTimers.push(setTimeout(() => {
+      this.cleanupRotationMask();
+    }, ROTATION_MASK_MAX_LIFETIME));
+  }
+
+  private cleanupRotationMask(): void {
+    this.clearRotationMaskTimers();
+    if (this.rotationMask !== null) {
+      this.rotationMask.release();
+    }
+    this.rotationMask = null;
+    this.rotationMaskOpacity = 1;
+  }
+
+  private clearRotationMaskTimers(): void {
+    this.rotationMaskTimers.forEach((t: number) => clearTimeout(t));
+    this.rotationMaskTimers = [];
   }
 
   aboutToAppear(): void {
@@ -174,9 +227,17 @@ struct Index {
         this.rotationCallback = (info: window.RotationChangeInfo) => {
           if (info.type === window.RotationChangeType.WINDOW_WILL_ROTATE) {
             this.bgColor = Color.Black;
-
+            this.rotatingCount++;
+            if (((info.orientation+this.currentOrientation)&1) === 1 && this.rotatingCount === 1) {
+              // 旋转角为 90° 或 270°，播放转屏动画
+              this.RotatationAnimation(w);
+            }
           } else if (info.type === window.RotationChangeType.WINDOW_DID_ROTATE) {
-            this.bgColor = $r("app.color.start_window_background");
+            this.currentOrientation = info.orientation;
+            this.rotatingCount--;
+            if (this.rotatingCount === 0) {
+              this.bgColor = $r("app.color.start_window_background");
+            }
           }
         };
         w.on('rotationChange', this.rotationCallback);
@@ -211,12 +272,17 @@ struct Index {
         if (this.rectCallback !== null) {
           this.win.off('windowRectChange', this.rectCallback);
         }
+        if (this.rotationCallback !== null) {
+          this.win.off('rotationChange', this.rotationCallback);
+        }
       } catch (err) {
         console.error(TAG, `off window listeners failed: ${err}`);
       }
       this.sizeCallback = null;
       this.rectCallback = null;
+      this.rotationCallback = null;
     }
+    this.clearRotationMaskTimers();
   }
 
   @Builder
@@ -346,6 +412,7 @@ struct Index {
         .onClick(() => {
           this.context.eventHub.emit(EVENT_TOP_MINE);
         })
+        .systemMaterial(topBarMaterial(true))
     } else {
       this.circleIconButton($r('sys.symbol.person_crop_circle_fill'), 44, 26, () => {
         this.context.eventHub.emit(EVENT_TOP_MINE);
@@ -546,9 +613,10 @@ struct Index {
     .hitTestBehavior(HitTestMode.Transparent)
   }
 
+
   build() {
     Stack({ alignContent: Alignment.Top }) {
-      FlutterPage({ viewId: this.viewId, xComponentRenderFit: RenderFit.TOP})
+      FlutterPage({ viewId: this.viewId, xComponentRenderFit: RenderFit.TOP })
         .width('100%')
         .height('100%')
         .align(Alignment.Top)
@@ -557,6 +625,21 @@ struct Index {
       }
       if (this.useNativeTopBar && deviceInfo.sdkApiVersion >= 26) {
         this.homeTopBarHost()
+      }
+      // 转屏遮罩
+      if (this.rotationMask !== null) {
+        Column()
+          .width('100%')
+          .height('100%')
+          .backgroundColor(Color.Black)
+          .opacity(this.rotationMaskOpacity)
+          .animation({ duration: ROTATION_MASK_FADE_DURATION, curve: Curve.EaseOut })
+        Image(this.rotationMask)
+          .objectFit(ImageFit.TOP)
+          .opacity(this.rotationMaskOpacity)
+          .animation({ duration: ROTATION_MASK_FADE_DURATION, curve: Curve.EaseOut })
+          .hitTestBehavior(HitTestMode.None)
+          .syncLoad(true)
       }
     }
     .width(this.winWidth > 0 ? this.winWidth : '100%')

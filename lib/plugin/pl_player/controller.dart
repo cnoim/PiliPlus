@@ -2042,7 +2042,12 @@ class PlPlayerController with BlockConfigMixin {
 
   void onCloseAll() {
     isCloseAll = true;
-    if (PlatformUtils.isDesktop) exitDesktopFullScreen();
+    if (PlatformUtils.isDesktop) {
+      exitDesktopFullScreen();
+    } else {
+      //规避鸿蒙悬浮窗全屏下，返回主页，方向不更新
+      triggerFullScreen(status: false);
+    }
     // dispose 已改为异步（退后台清内存），这里不阻塞路由返回
     unawaited(dispose());
     Get.until((route) => route.isFirst);

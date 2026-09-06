@@ -1863,7 +1863,7 @@ class PlPlayerController with BlockConfigMixin {
             isVertical: isVertical,
             orientation: orientation,
           );
-          if (OS.isHarmony && isManualFS) {
+          if (OS.isHarmony && !HarmonyChannel.isWindowMode) {
             // 手动进全屏的目标方向：横屏时等视口真正变横屏再置全屏布局，
             // 避免全屏先在竖屏/中间尺寸渲染，导致比例错误和动画跳变。
             final targetLandscape =

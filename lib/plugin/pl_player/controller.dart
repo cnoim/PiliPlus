@@ -72,7 +72,7 @@ import 'package:window_manager/window_manager.dart';
 
 typedef PlayCallback = Future<void>? Function();
 
-class PlPlayerController with BlockConfigMixin {
+class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   Player? _videoPlayerController;
   VideoController? _videoController;
 
@@ -704,12 +704,6 @@ class PlPlayerController with BlockConfigMixin {
   // offline
   bool get isFileSource => dataSource is FileSource;
 
-  late final _audioNormalization = Pref.audioNormalization;
-  late final enableAudioNormalization =
-      Platform.isAndroid && _audioNormalization != '0';
-  late final String _audioNormalizationParam =
-      AudioNormalization.getParamFromConfig(_audioNormalization);
-
   // 初始化资源
   //
   // 播放器是全局单例，多个视频页共享同一实例。setDataSource 内部会异步
@@ -931,8 +925,6 @@ class PlPlayerController with BlockConfigMixin {
     }
   }
 
-  static final loudnormRegExp = RegExp('loudnorm=([^,]+)');
-
   Future<Player> _initPlayer() async {
     assert(_videoPlayerController == null);
     final opt = {
@@ -1036,6 +1028,7 @@ class PlPlayerController with BlockConfigMixin {
           audioUri,
         );
       }
+      audioFilterExtras(volume, map: extras);
     } else {
       // 修复 Bug：从视频页返回直播间后，声音变成刚才视频的声音。
       // 原因：当前版本改用 NativePlayer.setProperty 直接设置 audio-files，
@@ -1044,31 +1037,6 @@ class PlPlayerController with BlockConfigMixin {
       // 当切换到无单独音频源的内容（如直播、关闭听视频）时，必须主动清空
       // audio-files，否则旧视频的外部音轨会继续播放，导致画面与声音不一致。
       player.platform!.maybeAsNativePlayer.setProperty('audio-files', '');
-      if (enableAudioNormalization) {
-        final String audioNormalization;
-        if (volume != null && volume.isNotEmpty) {
-          audioNormalization = _audioNormalizationParam.replaceFirstMapped(
-            loudnormRegExp,
-            (i) =>
-                'loudnorm=${volume.format(
-                  Map.fromEntries(
-                    i.group(1)!.split(':').map((item) {
-                      final parts = item.split('=');
-                      return MapEntry(parts[0].toLowerCase(), num.parse(parts[1]));
-                    }),
-                  ),
-                )}',
-          );
-        } else {
-          audioNormalization = _audioNormalizationParam.replaceFirst(
-            loudnormRegExp,
-            AudioNormalization.getParamFromConfig(Pref.fallbackNormalization),
-          );
-        }
-        if (audioNormalization.isNotEmpty) {
-          extras['lavfi-complex'] = '"[aid1] $audioNormalization [ao]"';
-        }
-      }
     }
 
     await player.open(

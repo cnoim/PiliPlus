@@ -2158,15 +2158,13 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   }
 
   Widget get _videoWidget {
-    return Obx(
-      () => Container(
-        clipBehavior: .none,
-        width: maxWidth,
-        height: maxHeight,
-        // 平台视图合成在 Flutter 表面之下，这层不透明底色会把视频盖住。
-        color: plPlayerController.usePlatformViewRx.value ? null : widget.fill,
-        child: Obx(
-          () => MouseInteractiveViewer(
+    return Container(
+      clipBehavior: .none,
+      width: maxWidth,
+      height: maxHeight,
+      color: widget.fill,
+      child: Obx(
+        () => MouseInteractiveViewer(
             scaleEnabled: !plPlayerController.controlsLock.value,
             pointerSignalFallback: _onPointerSignal,
             onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
@@ -2221,11 +2219,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                               visible: false,
                             ),
                         controller: videoController,
-                        // 平台视图渲染时视频由系统合成在 Flutter 表面之下，
-                        // 这里必须保持透明，否则会把视频整个盖住。
-                        fill: plPlayerController.usePlatformViewRx.value
-                            ? Colors.transparent
-                            : widget.fill,
+                        fill: widget.fill,
                         fit: videoFit.boxFit,
                         aspectRatio: videoFit.aspectRatio,
                       ),
@@ -2236,7 +2230,6 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             ),
           ),
         ),
-      ),
     );
   }
 

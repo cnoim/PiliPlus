@@ -46,8 +46,7 @@ class LiveDmBlockController extends GetxController
   void _updateLiveRoomRules() {
     if (_isLoaded && _controller != null) {
       _controller!.updateBlockRules(
-        // 上游 getx fork 的 `rawValue`，鸿蒙锁定的 fork 里对应 `value`
-        keywordList.value,
+        keywordList.rawValue,
         shieldUserList.map((e) => e.uid).toSet(),
       );
     }

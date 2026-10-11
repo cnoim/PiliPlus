@@ -26,7 +26,6 @@ import 'package:PiliPlus/pages/live_room/send_danmaku/view.dart';
 import 'package:PiliPlus/pages/video/widgets/header_control.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
-import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/danmaku_options.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/tcp/live.dart';
@@ -246,20 +245,6 @@ class LiveRoomController extends GetxController {
       isVertical: isPortrait.value,
       autoFullScreenFlag: autoFullScreenFlag,
     );
-  }
-
-  /// 链路在「宽带档 / 蜂窝档」之间翻转：改用该档的默认清晰度重新取流，
-  /// 并沿用翻转前的播放/暂停状态。
-  void _onNetworkScopeChanged(bool useCellular) {
-    if (isClosed) return;
-    // currentQn 是本页自己的状态，无论是否持有播放器都该保持最新
-    currentQn = useCellular ? Pref.liveQualityCellular : Pref.liveQuality;
-    // 叠加的播放页只有当前持有播放器的那个才真正换流
-    if (!identical(plPlayerController.sourceOwner, this)) return;
-    // 直播没有进度可保留，正在取流时直接丢弃本次事件即可：
-    // 那次取流会用上面刚写入的 currentQn
-    if (_queryingLiveUrl) return;
-    queryLiveUrl(autoplay: plPlayerController.playerStatus.isPlaying);
   }
 
   Future<void> queryLiveUrl({

@@ -34,9 +34,9 @@ import 'package:PiliPlus/utils/utils.dart';
 import 'package:collection/collection.dart';
 import 'package:floating/floating.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 abstract final class PageUtils {
@@ -554,7 +554,7 @@ abstract final class PageUtils {
     Dimension? dimension,
     Object? heroTag,
   }) {
-    final tag = heroTag ?? Utils.makeHeroTag(cid ?? bvid ?? aid);
+    final tag = heroTag ?? Utils.makeHeroTag(cid);
     final arguments = {
       'aid': aid ?? IdUtils.bv2av(bvid!),
       'bvid': bvid ?? IdUtils.av2bv(aid!),

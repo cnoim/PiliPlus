@@ -791,7 +791,7 @@ class VideoDetailController extends GetxController
     final audioList = data.dash?.audio;
     if (audioList != null && audioList.isNotEmpty) {
       final cacheAudioQa = plPlayerController.cacheAudioQa;
-      final List<int> audioIds = audioList.map((e) => e.id!).toList();
+      final List<int> audioIds = audioList.map((e) => e.id).toList();
       int closestNumber = audioIds.findClosestTarget(
         (e) => e <= cacheAudioQa,
         (a, b) => a > b ? a : b,
@@ -804,37 +804,10 @@ class VideoDetailController extends GetxController
         (e) => e.id == closestNumber,
         orElse: () => audioList.first,
       );
-      if (firstAudio.id case final int id?) {
+      if (firstAudio.id case final int id) {
         currentAudioQa = AudioQuality.fromCode(id);
       }
     }
-  }
-
-  /// 链路在「宽带档 / 蜂窝档」之间翻转：重新套用该档的画质、音质与编码偏好，
-  /// 并按新档位换流，保留播放进度与播放/暂停状态。
-  void _onNetworkScopeChanged(bool useCellular) {
-    if (isClosed || isFileSource) return;
-    // preferCodecs 是本页自己的状态，无论是否持有播放器都该保持最新，
-    // 这样被叠加在后面的页面恢复时不会用陈旧的编码偏好
-    preferCodecs = useCellular ? Pref.preferCodecsCellular : Pref.preferCodecs;
-
-    // 以下会改动共享的播放器单例，只有当前持有它的页面才能做
-    if (!identical(plPlayerController.sourceOwner, this)) return;
-    plPlayerController
-      ..cacheVideoQa = useCellular
-          ? Pref.defaultVideoQaCellular
-          : Pref.defaultVideoQa
-      ..cacheAudioQa = useCellular
-          ? Pref.defaultAudioQaCellular
-          : Pref.defaultAudioQa;
-
-    // 正在请求播放地址时不要并发换流：queryVideoUrl 会用新的档位选流，
-    // 若它拿到的是 durl 等无法换流的源，_pendingNetworkReselect 也会被清掉
-    if (isQuerying) {
-      _pendingNetworkReselect = true;
-      return;
-    }
-    _applyNetworkScope();
   }
 
   void _applyNetworkScope() {
